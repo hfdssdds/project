@@ -1,0 +1,240 @@
+from tkinter import *
+from tkinter import messagebox
+from tkinter import ttk
+import sqlite3
+
+# Создание базы данных
+conn = sqlite3.connect("contacts.db")
+c = conn.cursor()
+
+# Создание таблицы контактов
+c.execute(
+    """
+    CREATE TABLE IF NOT EXISTS contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        имя TEXT,
+        фамилия TEXT,
+        отчество TEXT,
+        телефон TEXT,
+        пароль TEXT
+    )
+    """
+)
+
+# Определение функций для работы с базой данных
+def добавить_контакт():
+    имя = entry_имя.get()
+    фамилия = entry_фамилия.get()
+    отчество = entry_отчество.get()
+    телефон = entry_телефон.get()
+    пароль = entry_пароль.get()
+
+    c.execute(
+        "INSERT INTO contacts (имя, фамилия, отчество, телефон, пароль) VALUES (?, ?, ?, ?, ?)",
+        (имя, фамилия, отчество, телефон, пароль),
+    )
+
+    conn.commit()
+    оповещение("Успех", "Контакт успешно добавлен в базу данных.")
+    очистить_поля()
+    обновить_список()
+
+def обновить_контакт():
+    selected_item = treeview.selection()
+    if not selected_item:
+        оповещение("Ошибка", "Выберите контакт для обновления.")
+        return
+
+    новое_имя = entry_имя.get()
+    новая_фамилия = entry_фамилия.get()
+    новое_отчество = entry_отчество.get()
+    новый_телефон = entry_телефон.get()
+    новый_пароль = entry_пароль.get()
+
+    старые_данные = treeview.item(selected_item)["values"]
+    старое_имя, старая_фамилия, старое_отчество, старый_телефон, старый_пароль = старые_данные
+
+    if (
+        новое_имя == старое_имя
+        and новая_фамилия == старая_фамилия
+        and новое_отчество == старое_отчество
+        and новый_телефон == старый_телефон
+        and новый_пароль == старый_пароль
+    ):
+        оповещение("Предупреждение", "Нет изменений для обновления.")
+        return
+
+    c.execute(
+        """
+        UPDATE contacts SET
+        имя = ?,
+        фамилия = ?,
+        отчество = ?,
+        телефон = ?,
+        пароль = ?
+        WHERE id = ?
+        """,
+        (
+            новое_имя,
+            новая_фамилия,
+            новое_отчество,
+            новый_телефон,
+            новый_пароль,
+            selected_item[0],
+        ),
+    )
+
+    conn.commit()
+    оповещение("Успех", "Контакт успешно обновлен.")
+    очистить_поля()
+    обновить_список()
+
+def удалить_контакт():
+    selected_item = treeview.selection()
+    if not selected_item:
+        оповещение("Ошибка", "Выберите контакт для удаления.")
+        return
+
+    подтверждение = messagebox.askyesno(
+        "Подтверждение", "Вы уверены, что хотите удалить выбранный контакт?"
+    )
+    if подтверждение:
+        контакт_id = treeview.item(selected_item)["values"][0]
+        c.execute("DELETE FROM contacts WHERE id = ?", (контакт_id,))
+        conn.commit()
+        оповещение("Успех", "Контакт успешно удален.")
+        обновить_список()
+
+def найти_контакт():
+    ключевое_слово = entry_поиск.get()
+
+    c.execute(
+        """
+        SELECT * FROM contacts
+        WHERE имя LIKE ? OR фамилия LIKE ? OR отчество LIKE ? OR телефон LIKE ?
+        """,
+        (f"%{ключевое_слово}%", f"%{ключевое_слово}%", f"%{ключевое_слово}%", f"%{ключевое_слово}%"),
+    )
+    найденные_контакты = c.fetchall()
+
+    treeview.delete(*treeview.get_children())
+
+    for контакт in найденные_контакты:
+        treeview.insert("", "end", values=контакт)
+
+def очистить_поля():
+    entry_имя.delete(0, "end")
+    entry_фамилия.delete(0, "end")
+    entry_отчество.delete(0, "end")
+    entry_телефон.delete(0, "end")
+    entry_пароль.delete(0, "end")
+
+def обновить_список():
+    c.execute("SELECT * FROM contacts")
+    все_контакты = c.fetchall()
+    treeview.delete(*treeview.get_children())
+
+    for контакт in все_контакты:
+        treeview.insert("", "end", values=контакт)
+
+def оповещение(заголовок, сообщение):
+    messagebox.showinfo(заголовок, сообщение)
+
+
+# Создание графического интерфейса
+root = Tk()
+root.title("Список контактов")
+
+# Создание полей для ввода данных
+frame_ввод = Frame(root)
+frame_ввод.pack(pady=10)
+
+label_имя = Label(frame_ввод, text="Имя:")
+label_имя.grid(row=0, column=0, padx=5)
+entry_имя = Entry(frame_ввод)
+entry_имя.grid(row=0, column=1, padx=5)
+
+label_фамилия = Label(frame_ввод, text="Фамилия:")
+label_фамилия.grid(row=1, column=0, padx=5)
+entry_фамилия = Entry(frame_ввод)
+entry_фамилия.grid(row=1, column=1, padx=5)
+
+label_отчество = Label(frame_ввод, text="Отчество:")
+label_отчество.grid(row=2, column=0, padx=5)
+entry_отчество = Entry(frame_ввод)
+entry_отчество.grid(row=2, column=1, padx=5)
+
+label_телефон = Label(frame_ввод, text="Телефон:")
+label_телефон.grid(row=3, column=0, padx=5)
+entry_телефон = Entry(frame_ввод)
+entry_телефон.grid(row=3, column=1, padx=5)
+
+label_пароль = Label(frame_ввод, text="Пароль:")
+label_пароль.grid(row=4, column=0, padx=5)
+entry_пароль = Entry(frame_ввод, show="*")
+entry_пароль.grid(row=4, column=1, padx=5)
+
+# Создание кнопок для выполнения операций
+frame_кнопки = Frame(root)
+frame_кнопки.pack(pady=10)
+
+button_добавить = Button(frame_кнопки, text="Добавить", command=добавить_контакт)
+button_добавить.grid(row=0, column=0, padx=5)
+
+button_обновить = Button(frame_кнопки, text="Обновить", command=обновить_контакт)
+button_обновить.grid(row=0, column=1, padx=5)
+
+button_удалить = Button(frame_кнопки, text="Удалить", command=удалить_контакт)
+button_удалить.grid(row=0, column=2, padx=5)
+
+button_найти = Button(frame_кнопки, text="Найти", command=найти_контакт)
+button_найти.grid(row=0, column=3, padx=5)
+
+button_очистить = Button(frame_кнопки, text="Очистить", command=очистить_поля)
+button_очистить.grid(row=0, column=4, padx=5)
+
+# Создание поля для поиска
+frame_поиск = Frame(root)
+frame_поиск.pack(pady=10)
+
+label_поиск = Label(frame_поиск, text="Поиск:")
+label_поиск.grid(row=0, column=0, padx=5)
+entry_поиск = Entry(frame_поиск)
+entry_поиск.grid(row=0, column=1, padx=5)
+
+button_поиск = Button(frame_поиск, text="Найти", command=найти_контакт)
+button_поиск.grid(row=0, column=2, padx=5)
+
+# Создание виджета Treeview для вывода данных
+frame_treeview = Frame(root)
+frame_treeview.pack(pady=10)
+
+treeview = ttk.Treeview(
+    frame_treeview,
+    columns=("ID", "Имя", "Фамилия", "Отчество", "Телефон", "Пароль"),
+    show="headings",
+)
+
+treeview.column("ID", width=30)
+treeview.column("Имя", width=100)
+treeview.column("Фамилия", width=100)
+treeview.column("Отчество", width=100)
+treeview.column("Телефон", width=100)
+treeview.column("Пароль", width=100)
+
+treeview.heading("ID", text="ID")
+treeview.heading("Имя", text="Имя")
+treeview.heading("Фамилия", text="Фамилия")
+treeview.heading("Отчество", text="Отчество")
+treeview.heading("Телефон", text="Телефон")
+treeview.heading("Пароль", text="Пароль")
+
+treeview.pack()
+
+# Запуск приложения
+обновить_список()
+root.mainloop()
+
+# Закрытие базы данных
+c.close()
+conn.close()
